@@ -2,7 +2,10 @@ import os
 import json
 from groq import Groq
 from dotenv import load_dotenv
-from .models import IssueAnalysis
+try:
+    from .models import IssueAnalysis
+except ImportError:
+    from models import IssueAnalysis
 
 load_dotenv()
 
