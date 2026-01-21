@@ -9,8 +9,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
     from backend.github_client import fetch_issue_data
     from backend.ai_client import analyze_issue
-except ImportError:
-    st.error("Could not import backend modules. Make sure the 'backend' directory exists.")
+except ImportError as e:
+    st.error(f"Could not import backend modules. Error: {e}")
+    st.code(f"Current working directory: {os.getcwd()}")
+    st.code(f"System path: {sys.path}")
     st.stop()
 
 st.set_page_config(page_title="GitHub Issue Assistant", page_icon="🐞", layout="centered")
