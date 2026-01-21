@@ -1,7 +1,14 @@
-import streamlit as st
-import httpx
-import os
-from pydantic import ValidationError
+import sys
+import asyncio
+# Add the parent directory to sys.path so we can import from backend
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+try:
+    from backend.github_client import fetch_issue_data
+    from backend.ai_client import analyze_issue
+except ImportError:
+    st.error("Could not import backend modules. Make sure the 'backend' directory exists.")
+    st.stop()
 
 st.set_page_config(page_title="GitHub Issue Assistant", page_icon="🐞", layout="centered")
 
@@ -14,51 +21,75 @@ with st.form("issue_form"):
     issue_number = st.number_input("Issue Number", min_value=1, step=1)
     submitted = st.form_submit_button("Analyze Issue")
 
+async def process_issue(owner, repo, issue_num):
+    # Fetch data
+    issue_data = await fetch_issue_data(owner, repo, issue_num)
+    # Analyze with AI
+    analysis = analyze_issue(issue_data)
+    return analysis
+
 if submitted:
     if not repo_url:
         st.error("Please enter a repository URL.")
     else:
         with st.spinner("Fetching and analyzing issue..."):
             try:
-                # Call Backend API
-                api_url = os.getenv("API_URL", "http://127.0.0.1:8000").rstrip("/") + "/analyze"
-                payload = {
-                    "repo_url": repo_url,
-                    "issue_number": issue_number
-                }
+                # Parse URL
+                from urllib.parse import urlparse
+                parsed_url = urlparse(repo_url)
+                path_segments = parsed_url.path.strip("/").split("/")
+                if len(path_segments) < 2:
+                    raise ValueError("Invalid GitHub Repository URL")
                 
-                response = httpx.post(api_url, json=payload, timeout=30.0)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Display Results
-                    st.success("Analysis Complete!")
-                    
-                    st.subheader(data["summary"])
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(f"**Type**<br>{data['type'].replace('_', ' ').title()}", unsafe_allow_html=True)
-                    with col2:
-                        st.markdown(f"**Priority**<br>{data['priority_score']}", unsafe_allow_html=True)
-                    with col3:
-                        st.write("**Labels**")
-                        st.write(", ".join([f"`{label}`" for label in data["suggested_labels"]]))
-                    
+                owner = path_segments[-2]
+                repo = path_segments[-1]
+                if repo.endswith(".git"):
+                    repo = repo[:-4]
 
+                # Run logic directly
+                # We need a new loop or use asyncio.run if not in an existing loop
+                # Streamlit runs in a separate thread, usually, but often no loop.
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                # If there's already a running loop (unlikely in standard script run but possible), use create_task
+                # Ideally, just run_until_complete
+                
+                data = loop.run_until_complete(process_issue(owner, repo, issue_number))
+                
+                # Display Results
+                st.success("Analysis Complete!")
+                
+                # Convert pydantic model to dict if needed, or access attributes directly
+                # The model is IssueAnalysis
+                
+                st.subheader(data.summary)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(f"**Type**<br>{data.type.replace('_', ' ').title()}", unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"**Priority**<br>{data.priority_score}", unsafe_allow_html=True)
+                with col3:
+                    st.write("**Labels**")
+                    st.write(", ".join([f"`{label}`" for label in data.suggested_labels]))
+                
+
+                
+                st.markdown("### Potential Impact")
+                st.warning(data.potential_impact)
                     
-                    st.markdown("### Potential Impact")
-                    st.warning(data["potential_impact"])
-                    
-                else:
-                    st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
-            
-            except httpx.ConnectError:
-                st.error("Could not connect to the backend server. Is it running?")
+            except ValueError as e:
+                st.error(f"Error: {str(e)}")
             except Exception as e:
+                import traceback
                 st.error(f"An unexpected error occurred: {str(e)}")
+                st.expander("Details").code(traceback.format_exc())
 
 # Footer
 st.markdown("---")
-st.caption("Powered by Groq & FastAPI")
+st.caption("Powered by Groq & FastAPI (Embedded)")
+
