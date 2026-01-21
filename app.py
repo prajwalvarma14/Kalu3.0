@@ -1,6 +1,8 @@
 import sys
 import os
 import asyncio
+import streamlit as st
+
 # Add the parent directory to sys.path so we can import from backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
