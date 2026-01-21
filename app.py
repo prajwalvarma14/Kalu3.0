@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 # Add the parent directory to sys.path so we can import from backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -92,4 +93,3 @@ if submitted:
 # Footer
 st.markdown("---")
 st.caption("Powered by Groq & FastAPI (Embedded)")
-
