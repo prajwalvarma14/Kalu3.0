@@ -3,14 +3,31 @@ import os
 import asyncio
 import streamlit as st
 
-# Add the parent directory to sys.path so we can import from backend
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Robustly find the backend directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_path = None
+
+# Search up to 3 levels up to find where 'backend' is located
+for _ in range(3):
+    if os.path.exists(os.path.join(current_dir, "backend")):
+        backend_path = current_dir
+        break
+    current_dir = os.path.dirname(current_dir)
+
+if backend_path:
+    if backend_path not in sys.path:
+        sys.path.append(backend_path)
+else:
+    st.error("Could not find 'backend' directory. Please ensure the 'backend' folder is pushed to GitHub.")
+    st.code(f"Search started from: {os.path.dirname(os.path.abspath(__file__))}")
+    st.stop()
 
 try:
     from backend.github_client import fetch_issue_data
     from backend.ai_client import analyze_issue
 except ImportError as e:
     st.error(f"Could not import backend modules. Error: {e}")
+    st.info("Ensure that 'backend/__init__.py' exists and is pushed to GitHub.")
     st.code(f"Current working directory: {os.getcwd()}")
     st.code(f"System path: {sys.path}")
     st.stop()
