@@ -14,23 +14,27 @@ for _ in range(3):
         break
     current_dir = os.path.dirname(current_dir)
 
-if backend_path:
-    if backend_path not in sys.path:
-        sys.path.append(backend_path)
-else:
-    st.error("Could not find 'backend' directory. Please ensure the 'backend' folder is pushed to GitHub.")
-    st.code(f"Search started from: {os.path.dirname(os.path.abspath(__file__))}")
-    st.stop()
+if backend_path and backend_path not in sys.path:
+    sys.path.append(backend_path)
 
 try:
+    # Try importing as a package (standard structure)
     from backend.github_client import fetch_issue_data
     from backend.ai_client import analyze_issue
-except ImportError as e:
-    st.error(f"Could not import backend modules. Error: {e}")
-    st.info("Ensure that 'backend/__init__.py' exists and is pushed to GitHub.")
-    st.code(f"Current working directory: {os.getcwd()}")
-    st.code(f"System path: {sys.path}")
-    st.stop()
+except ImportError:
+    try:
+        # Fallback: Try importing directly (flat structure / root deployment)
+        # This requires the file to be in the same directory or in sys.path
+        import sys
+        sys.path.append(os.getcwd()) # Ensure current dir is in path
+        from github_client import fetch_issue_data
+        from ai_client import analyze_issue
+    except ImportError as e:
+        st.error(f"Could not import backend modules. Directory structure might be incorrect. Error: {e}")
+        st.info("Ensure files are either in a 'backend' folder OR all in the root directory.")
+        st.code(f"Current working directory: {os.getcwd()}")
+        st.code(f"System path: {sys.path}")
+        st.stop()
 
 st.set_page_config(page_title="GitHub Issue Assistant", page_icon="🐞", layout="centered")
 
